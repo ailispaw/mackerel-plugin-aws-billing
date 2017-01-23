@@ -20,13 +20,17 @@ Caution: You must must enable Billing Alerts.(see https://docs.aws.amazon.com/ja
 Send data to Host.  
 
 ```shell
-mackerel-plugin-aws-billing [-access-key-id=<id>] [-secret-access-key=<key>] [-target=<aws-services>] [-currency=<currency>]
+go get github.com/littlekbt/mackerel-plugin-aws-billing/lib
+```
+
+```shell
+/path/to/mackerel-plugin-aws-billing/main [-access-key-id=<id>] [-secret-access-key=<key>] [-target=<aws-services>] [-currency=<currency>]
 ```
 
 Send data to Service Metric.  
 
 ```shell
-mackerel-plugin-aws-billing [-access-key-id=<id>] [-secret-access-key=<key>] [-target=<aws-services>] [-currency=<currency>] [-dest=<SerivceMetric or Host>] [-api-key=<api-key>] [-service-name=<servicename>]
+/path/to/mackerel-plugin-aws-billing/main [-access-key-id=<id>] [-secret-access-key=<key>] [-target=<aws-services>] [-currency=<currency>] [-dest=<SerivceMetric or Host>] [-api-key=<api-key>] [-service-name=<servicename>]
 ```
 
 - access-key-id(required)*1  

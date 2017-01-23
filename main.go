@@ -2,8 +2,9 @@ package main
 
 import (
 	"flag"
-	"github.com/littlekbt/mackerel-plugin-aws-billing/lib"
 	"time"
+
+	"github.com/littlekbt/mackerel-plugin-aws-billing/lib"
 )
 
 func main() {
