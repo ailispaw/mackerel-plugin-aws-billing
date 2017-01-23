@@ -2,7 +2,6 @@ package mpawsbilling
 
 import (
   "flag"
-  "time"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -150,7 +149,7 @@ func getServiceNameList(metrics *cloudwatch.ListMetricsOutput) (target []string)
 	return target
 }
 
-func WriteCache(optAccessKeyID string, optSecretAccessKey string, optCurrency string, optTarget string) {
+func writeCache(optAccessKeyID string, optSecretAccessKey string, optCurrency string, optTarget string) {
 
 	var billing AWSBilling
 
@@ -232,7 +231,7 @@ func readData() (interface{}, error) {
 	return f, nil
 }
 
-func OutputData() {
+func outputData() {
 	var billingCache BillingCachePlugin
 
 	f, err := readData()
@@ -259,7 +258,7 @@ type MetricValue struct {
 	Value float64 `json:"value"`
 }
 
-func SendServiceMetric(optApiKey string, optServiceName string) {
+func sendServiceMetric(optApiKey string, optServiceName string) {
 
 	f, err := readData()
 
@@ -300,12 +299,12 @@ func Do() {
   flag.Parse()
 
   if now.Minute() == 0 {
-    mpawsbilling.WriteCache(*optAccessKeyID, *optSecretAccessKey, *optCurrency, *optTarget)
+    writeCache(*optAccessKeyID, *optSecretAccessKey, *optCurrency, *optTarget)
   }
 
   if *optDest == "ServiceMetric" {
-    mpawsbilling.SendServiceMetric(*optApiKey, *optServiceName)
+    sendServiceMetric(*optApiKey, *optServiceName)
   } else if *optDest == "Host" {
-    mpawsbilling.OutputData()
+    outputData()
   }
 }
