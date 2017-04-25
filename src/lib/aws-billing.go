@@ -168,7 +168,10 @@ func writeCache(optAccessKeyID string, optSecretAccessKey string, optCurrency st
 
 	var target []string
 	if optTarget == "" {
-		metrics, _ := billing.CloudWatch.ListMetrics(&cloudwatch.ListMetricsInput{Namespace: aws.String("AWS/Billing")})
+		metrics, err := billing.CloudWatch.ListMetrics(&cloudwatch.ListMetricsInput{Namespace: aws.String("AWS/Billing")})
+		if err != nil {
+			panic(err)
+		}
 		target = getServiceNameList(metrics)
 		target = append([]string{"All"}, target...)
 	} else {
