@@ -14,4 +14,6 @@ RUN apk --no-cache add --virtual build-deps git go build-base && \
     rm -rf /usr/lib/go && \
     rm -rf "${GOPATH}"
 
+RUN apk --no-cache add ca-certificates
+
 ENTRYPOINT [ "mackerel-plugin-aws-billing" ]
