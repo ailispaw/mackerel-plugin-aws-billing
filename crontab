@@ -1,0 +1,1 @@
+3 * * * * docker restart mackerel-plugin-aws-billing
