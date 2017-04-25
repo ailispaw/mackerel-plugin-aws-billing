@@ -17,55 +17,34 @@ Caution: You must must enable Billing Alerts.(see https://docs.aws.amazon.com/ja
 
 ## Usage
 
-Send data to Host.  
+You must set environment variables in `.env` file first.
 
-```shell
-mackerel-plugin-aws-billing [-access-key-id=<id>] [-secret-access-key=<key>] [-target=<aws-services>] [-currency=<currency>]
-```
+- MACKEREL_METRICS(required)  
+  Use ServiceMetric.
 
-Send data to Service Metric.  
-
-```shell
-mackerel-plugin-aws-billing [-access-key-id=<id>] [-secret-access-key=<key>] [-target=<aws-services>] [-currency=<currency>] [-dest=<SerivceMetric or Host>] [-api-key=<api-key>] [-service-name=<servicename>]
-```
-
-- access-key-id(required)*1  
-  access-key-id is published by AWS. It is required to use AWS API. 
-
-- secret-access-key(required)*1  
-  secret-access-key is published by AWS. It is required to use AWS API.. 
-
-- target(optional)  
-  If target is not specified, this plugin gets all available services.
-  If target is specified, this plugin gets specified available services.
-  If you want to specify multiple services, separate with comma.(ex: target=AmazonEC2,AWSLambda)
-  If you want to get sum of costs, give All to target.(ex: target=All) 
-
-  You can get cost of service that you use.
-
-- currency(optional)  
-  Defalut is in US Dollar.
-
-- dest(required)  
-  Use ServiceMetric or Host.
-
-  If set ServiceMetric, This plugin outputs data to ServiceMetric.
-  If set Host, This plugin outputs data to Host.
-
-- api-key(required)*2  
-  Required only if ServiceMetric is given to mode parameter.
-  API Key is published by mackerel. 
+- MACKEREL_API_KEY(required)  
+  MACKEREL_API_KEY is an API Key published by mackerel. 
   You must give read and write premissions to API Key.
 
-- service-name(required)*2  
-  Required only if ServiceMetric is given to mode parameter.
+- MACKEREL_SERVICE(required)  
   Specify mackerel service name to make graph on Service Metric page.
 
-*1 You can set keys by environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY (see https://github.com/aws/aws-sdk-go#configuring-credentials)  
-*2 Required only if ServiceMetric is given to mode parameter.  
+- AWS_ACCESS_KEY_ID(required)  
+  AWS_ACCESS_KEY_ID is published by AWS. It is required to use AWS API.
 
-### Example of mackerel-agent.conf
-```
-[plugin.metrics.aws-billing]
-command = "/path/to/mackerel-plugin-aws-billing/main" ... //arguments
+- AWS_SECRET_ACCESS_KEY(required)  
+  AWS_SECRET_ACCESS_KEY is published by AWS. It is required to use AWS API..
+
+- AWS_TARGET_SERVICE(optional)  
+  If AWS_TARGET_SERVICE is not specified, this plugin gets all available services.  
+  If AWS_TARGET_SERVICE is specified, this plugin gets specified available services.  
+  If you want to specify multiple services, separate with comma.(ex: AWS_TARGET_SERVICE=AmazonEC2,AWSLambda)  
+  If you want to get sum of costs, give All to target.(ex: AWS_TARGET_SERVICE=All)
+
+- AWS_DIMENSION_CURRENCY(optional)  
+  Defalut is in US Dollar(USD).
+
+```shell
+$ docker run --name mackerel-plugin-aws-billing --env-file .env ailispaw/mackerel-plugin-aws-billing
+$ echo "3 * * * * docker restart mackerel-plugin-aws-billing" | crontab -
 ```

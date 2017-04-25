@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -288,21 +287,26 @@ func sendServiceMetric(optApiKey string, optServiceName string) {
 
 func Do() {
 
-	optDest := flag.String("dest", "", "Please Specify ServiceMetric or Host (※default Host)")
-	optApiKey := flag.String("api-key", "", "API Key must have read and write authority")
-	optServiceName := flag.String("service-name", "", "target serviceName")
-	optAccessKeyID := flag.String("access-key-id", "", "AWS Access Key ID")
-	optSecretAccessKey := flag.String("secret-access-key", "", "AWS Secret Access Key")
-	optCurrency := flag.String("currency", "USD", "Unit of currency")
-	optTarget := flag.String("target", "", "Target AWS Service. if no specific Aws Service, get metrics list from cloudwatch and draw all available metrics")
-	flag.Parse()
+	optDest := os.Getenv("MACKEREL_METRICS")
+	if optDest == "" {
+		optDest = "ServiceMetric"
+	}
+	optApiKey := os.Getenv("MACKEREL_API_KEY")
+	optServiceName := os.Getenv("MACKEREL_SERVICE")
+	optAccessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
+	optSecretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
+	optCurrency := os.Getenv("AWS_DIMENSION_CURRENCY")
+	if optCurrency == "" {
+		optDest = "USD"
+	}
+	optTarget := os.Getenv("AWS_TARGET_SERVICE")
 
-	writeCache(*optAccessKeyID, *optSecretAccessKey, *optCurrency, *optTarget)
+	writeCache(optAccessKeyID, optSecretAccessKey, optCurrency, optTarget)
 
-	if *optDest == "ServiceMetric" {
-		log.Printf("Send ServiceMetric to %s\n", *optServiceName)
-		sendServiceMetric(*optApiKey, *optServiceName)
-	} else if *optDest == "Host" {
+	if optDest == "ServiceMetric" {
+		log.Printf("Send ServiceMetric to %s\n", optServiceName)
+		sendServiceMetric(optApiKey, optServiceName)
+	} else if optDest == "Host" {
 		outputData()
 	}
 }
