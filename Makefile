@@ -18,7 +18,6 @@ push:
 	docker push $(IMAGE):latest
 
 clean:
-	docker rm $$(docker ps -q -f "exited!=0")
 	docker rmi $$(docker images -q -f "dangling=true")
 
 .PHONY: run build release push clean
