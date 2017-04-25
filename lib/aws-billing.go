@@ -300,6 +300,7 @@ func Do() {
 	writeCache(*optAccessKeyID, *optSecretAccessKey, *optCurrency, *optTarget)
 
 	if *optDest == "ServiceMetric" {
+		log.Printf("Send ServiceMetric to %s\n", *optServiceName)
 		sendServiceMetric(*optApiKey, *optServiceName)
 	} else if *optDest == "Host" {
 		outputData()
