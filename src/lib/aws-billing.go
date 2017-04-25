@@ -300,7 +300,7 @@ func Do() {
 	optSecretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
 	optCurrency := os.Getenv("AWS_DIMENSION_CURRENCY")
 	if optCurrency == "" {
-		optDest = "USD"
+		optCurrency = "USD"
 	}
 	optTarget := os.Getenv("AWS_TARGET_SERVICE")
 
