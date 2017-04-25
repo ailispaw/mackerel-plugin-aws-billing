@@ -273,7 +273,7 @@ func sendServiceMetric(optApiKey string, optServiceName string) {
 	now := time.Now().Unix()
 	for name, value := range mapObj {
 		f64, _ := strconv.ParseFloat(value.(string), 64)
-		metricValue := MetricValue{Name: name, Value: f64, Time: now}
+		metricValue := MetricValue{Name: "AWS.Billing." + name, Value: f64, Time: now}
 
 		metricValues = append(metricValues, metricValue)
 	}
