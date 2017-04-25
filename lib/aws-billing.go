@@ -175,6 +175,8 @@ func writeCache(optAccessKeyID string, optSecretAccessKey string, optCurrency st
 		target = strings.Split(optTarget, ",")
 	}
 
+	log.Printf("Getting metrics%s\n", target)
+
 	billing.Target = target
 
 	billing.WriteLatestValue()
@@ -305,7 +307,7 @@ func Do() {
 	writeCache(optAccessKeyID, optSecretAccessKey, optCurrency, optTarget)
 
 	if optDest == "ServiceMetric" {
-		log.Printf("Send ServiceMetric to %s\n", optServiceName)
+		log.Printf("Send metrics to ServiceMetric[%s]\n", optServiceName)
 		sendServiceMetric(optApiKey, optServiceName)
 	} else if optDest == "Host" {
 		outputData()
