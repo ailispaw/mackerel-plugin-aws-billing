@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/littlekbt/mackerel-plugin-aws-billing/lib"
+	"github.com/littlekbt/mackerel-plugin-aws-billing/src/lib"
 )
 
 func main() {
