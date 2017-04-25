@@ -1,10 +1,10 @@
 package mpawsbilling
 
 import (
-  "flag"
 	"bytes"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -288,23 +288,23 @@ func sendServiceMetric(optApiKey string, optServiceName string) {
 
 func Do() {
 
-  now := time.Now()
-  optDest := flag.String("dest", "", "Please Specify ServiceMetric or Host (※default Host)")
-  optApiKey := flag.String("api-key", "", "API Key must have read and write authority")
-  optServiceName := flag.String("service-name", "", "target serviceName")
-  optAccessKeyID := flag.String("access-key-id", "", "AWS Access Key ID")
-  optSecretAccessKey := flag.String("secret-access-key", "", "AWS Secret Access Key")
-  optCurrency := flag.String("currency", "USD", "Unit of currency")
-  optTarget := flag.String("target", "", "Target AWS Service. if no specific Aws Service, get metrics list from cloudwatch and draw all available metrics")
-  flag.Parse()
+	now := time.Now()
+	optDest := flag.String("dest", "", "Please Specify ServiceMetric or Host (※default Host)")
+	optApiKey := flag.String("api-key", "", "API Key must have read and write authority")
+	optServiceName := flag.String("service-name", "", "target serviceName")
+	optAccessKeyID := flag.String("access-key-id", "", "AWS Access Key ID")
+	optSecretAccessKey := flag.String("secret-access-key", "", "AWS Secret Access Key")
+	optCurrency := flag.String("currency", "USD", "Unit of currency")
+	optTarget := flag.String("target", "", "Target AWS Service. if no specific Aws Service, get metrics list from cloudwatch and draw all available metrics")
+	flag.Parse()
 
-  if now.Minute() == 0 {
-    writeCache(*optAccessKeyID, *optSecretAccessKey, *optCurrency, *optTarget)
-  }
+	if now.Minute() == 0 {
+		writeCache(*optAccessKeyID, *optSecretAccessKey, *optCurrency, *optTarget)
+	}
 
-  if *optDest == "ServiceMetric" {
-    sendServiceMetric(*optApiKey, *optServiceName)
-  } else if *optDest == "Host" {
-    outputData()
-  }
+	if *optDest == "ServiceMetric" {
+		sendServiceMetric(*optApiKey, *optServiceName)
+	} else if *optDest == "Host" {
+		outputData()
+	}
 }
