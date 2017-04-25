@@ -3,7 +3,7 @@ IMAGE   := ailispaw/$(NAME)
 VERSION := 0.2.0
 
 run:
-	docker rm -f $(NAME)
+	-docker rm -f $(NAME)
 	docker run --name $(NAME) --env-file .env $(IMAGE)
 
 build:
