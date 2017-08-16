@@ -1,15 +1,10 @@
 package mpawsbilling
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io/ioutil"
+	"flag"
 	"log"
-	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -17,44 +12,73 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
-
-	mp "github.com/mackerelio/go-mackerel-plugin"
 )
 
 type AWSBilling struct {
 	Region      string
 	Currency    string
-	Target      []string
 	Credentials *credentials.Credentials
 	CloudWatch  *cloudwatch.CloudWatch
 }
 
-func getLatestValue(cloudWatch *cloudwatch.CloudWatch, dimensions []*cloudwatch.Dimension) (float64, error) {
+type MetricValue struct {
+	Name  string  `json:"name"`
+	Time  int64   `json:"time"`
+	Value float64 `json:"value"`
+}
+
+func (b AWSBilling) GetServiceNameList() (targets []string) {
+	out, err := b.CloudWatch.ListMetrics(
+		&cloudwatch.ListMetricsInput{
+			Namespace: aws.String("AWS/Billing"),
+		})
+	if err != nil {
+		log.Fatalf("Failed to ListMetrics: %v", err)
+	}
+
+	for _, metric := range out.Metrics {
+		for _, dimension := range metric.Dimensions {
+			if *dimension.Name == "ServiceName" {
+				targets = append(targets, *dimension.Value)
+			}
+		}
+	}
+
+	return targets
+}
+
+func (b AWSBilling) GetMetricValue(target string) (*MetricValue, error) {
+	var dimensions = []*cloudwatch.Dimension{
+		&cloudwatch.Dimension{
+			Name:  aws.String("Currency"),
+			Value: aws.String(b.Currency),
+		},
+		&cloudwatch.Dimension{
+			Name:  aws.String("ServiceName"),
+			Value: aws.String(target),
+		},
+	}
+
 	now := time.Now()
+	startTime := time.Unix(now.Unix()-(24*60*60), int64(now.Nanosecond()))
 
-	startTime := time.Unix(now.Unix()-86400, int64(now.Nanosecond()))
-
-	statistics := []*string{aws.String("Maximum")}
-
-	in := &cloudwatch.GetMetricStatisticsInput{
+	out, err := b.CloudWatch.GetMetricStatistics(&cloudwatch.GetMetricStatisticsInput{
 		Dimensions: dimensions,
 		StartTime:  aws.Time(startTime),
 		EndTime:    aws.Time(now),
 		Namespace:  aws.String("AWS/Billing"),
 		MetricName: aws.String("EstimatedCharges"),
-		Period:     aws.Int64(3600),
-		Statistics: statistics,
-	}
-
-	out, err := cloudWatch.GetMetricStatistics(in)
+		Period:     aws.Int64(60 * 60),
+		Statistics: []*string{aws.String("Maximum")},
+	})
 
 	if err != nil {
-		return 0, nil
+		return nil, err
 	}
 
 	datapoints := out.Datapoints
 	if len(datapoints) == 0 {
-		return 0, errors.New("fetched no datapoints")
+		return nil, errors.New("no datapoints")
 	}
 
 	var latest time.Time
@@ -67,98 +91,54 @@ func getLatestValue(cloudWatch *cloudwatch.CloudWatch, dimensions []*cloudwatch.
 		}
 	}
 
-	return *datapoints[latestIndex].Maximum, nil
+	return &MetricValue{
+		Name:  target,
+		Time:  (*datapoints[latestIndex].Timestamp).Unix(),
+		Value: *datapoints[latestIndex].Maximum,
+	}, nil
 }
 
-func toJson(data map[string]float64) string {
-	jsonStr := `{`
-	var jsonInner []string
-	for k, v := range data {
-		jsonInner = append(jsonInner, []string{`"` + k + `"` + `:` + `"` + fmt.Sprint(v) + `"`}...)
-	}
-	jsonStr += strings.Join(jsonInner[:], ",") + `}`
+func Do() {
+	var (
+		optDebug  bool
+		optDryRun bool
+		optHelp   bool
+	)
 
-	return jsonStr
-}
+	flag.BoolVar(&optDebug, "d", false, "Debug mode")
+	flag.BoolVar(&optDryRun, "n", false, "Not send metrics to Mackerel, just check metrics with -d")
+	flag.BoolVar(&optHelp, "h", false, "Show this help message")
+	flag.Parse()
 
-func (p AWSBilling) WriteLatestValue() {
-	data := make(map[string]float64)
-	file, err := os.OpenFile("/tmp/aws-billing-cache", os.O_WRONLY|os.O_CREATE, 0600)
-
-	if err != nil {
-		panic(err)
+	if optHelp {
+		flag.PrintDefaults()
+		return
 	}
 
-	defer func() {
-		file.Close()
-	}()
-
-	baseDimension := []*cloudwatch.Dimension{&cloudwatch.Dimension{
-		Name:  aws.String("Currency"),
-		Value: aws.String(p.Currency),
-	}}
-
-	goroutines := len(p.Target)
-	c := make(chan map[string]float64)
-	for _, metricName := range p.Target {
-		go func(s chan<- map[string]float64, metricName string) {
-			var dimensions []*cloudwatch.Dimension
-			if metricName == "All" {
-				dimensions = baseDimension
-			} else {
-				dimensions = append(
-					[]*cloudwatch.Dimension{baseDimension[0]},
-					[]*cloudwatch.Dimension{&cloudwatch.Dimension{
-						Name:  aws.String("ServiceName"),
-						Value: aws.String(metricName),
-					}}...)
-
-			}
-
-			v, err := getLatestValue(p.CloudWatch, dimensions)
-			if err == nil {
-				s <- map[string]float64{metricName: v}
-			} else {
-				log.Printf("%s: %s", metricName, err)
-			}
-
-		}(c, metricName)
+	if os.Getenv("DEBUG") != "" {
+		optDebug = true
 	}
 
-	for i := 0; i < goroutines; i++ {
-		for k, v := range <-c {
-			data[k] = v
-		}
+	optAccessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
+	if optAccessKeyID == "" {
+		log.Fatal("Please set AWS_ACCESS_KEY_ID environment variable.")
 	}
 
-	close(c)
-
-	file.WriteString(toJson(data))
-}
-
-func getServiceNameList(metrics *cloudwatch.ListMetricsOutput) (target []string) {
-	for _, metric := range metrics.Metrics {
-		for _, dimension := range metric.Dimensions {
-			if *dimension.Name == "ServiceName" {
-				target = append(target, []string{*dimension.Value}...)
-			}
-		}
+	optSecretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
+	if optSecretAccessKey == "" {
+		log.Fatal("Please set AWS_SECRET_ACCESS_KEY environment variable.")
 	}
 
-	return target
-}
-
-func writeCache(optAccessKeyID string, optSecretAccessKey string, optCurrency string, optTarget string) {
+	optCurrency := os.Getenv("AWS_DIMENSION_CURRENCY")
+	if optCurrency == "" {
+		optCurrency = "USD"
+	}
 
 	var billing AWSBilling
 
-	if optAccessKeyID != "" && optSecretAccessKey != "" {
-		billing.Credentials = credentials.NewStaticCredentials(optAccessKeyID, optSecretAccessKey, "")
-	}
-
 	billing.Region = "us-east-1"
-
 	billing.Currency = optCurrency
+	billing.Credentials = credentials.NewStaticCredentials(optAccessKeyID, optSecretAccessKey, "")
 
 	billing.CloudWatch = cloudwatch.New(session.New(
 		&aws.Config{
@@ -166,153 +146,68 @@ func writeCache(optAccessKeyID string, optSecretAccessKey string, optCurrency st
 			Region:      aws.String(billing.Region),
 		}))
 
-	var target []string
-	if optTarget == "" {
-		metrics, err := billing.CloudWatch.ListMetrics(&cloudwatch.ListMetricsInput{Namespace: aws.String("AWS/Billing")})
-		if err != nil {
-			panic(err)
-		}
-		target = getServiceNameList(metrics)
-		target = append([]string{"All"}, target...)
-	} else {
-		target = strings.Split(optTarget, ",")
-	}
+	var targets []string
 
-	log.Printf("Getting metrics%s\n", target)
-
-	billing.Target = target
-
-	billing.WriteLatestValue()
-}
-
-type BillingCachePlugin struct {
-	Data map[string]interface{}
-}
-
-func (p BillingCachePlugin) GraphDefinition() map[string]mp.Graphs {
-	metrics := func() []mp.Metrics {
-		var metrics []mp.Metrics
-		for target, _ := range p.Data {
-			metrics = append(metrics, []mp.Metrics{mp.Metrics{Name: target, Label: target}}...)
-		}
-
-		return metrics
-	}()
-
-	return map[string]mp.Graphs{
-		"billing.all": mp.Graphs{
-			Label:   "AWSBilling",
-			Unit:    "float",
-			Metrics: metrics,
-		},
-	}
-}
-
-func (p BillingCachePlugin) FetchMetrics() (map[string]float64, error) {
-	stat := make(map[string]float64)
-
-	for k, v := range p.Data {
-		f, _ := strconv.ParseFloat(v.(string), 64)
-		stat[k] = f
-	}
-
-	return stat, nil
-}
-
-func readData() (interface{}, error) {
-	data, err := ioutil.ReadFile(`/tmp/aws-billing-cache`)
-	if err != nil {
-		return nil, err
-	}
-
-	str := string(data)
-	var f interface{}
-	err = json.Unmarshal([]byte(str), &f)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return f, nil
-}
-
-func outputData() {
-	var billingCache BillingCachePlugin
-
-	f, err := readData()
-
-	if err != nil {
-		panic("failed to parse /tmp/aws-billing-cache")
-	}
-
-	billingCache.Data = f.(map[string]interface{})
-
-	helper := mp.NewMackerelPlugin(billingCache)
-
-	if os.Getenv("MACKEREL_AGENT_PLUGIN_META") != "" {
-		helper.OutputDefinitions()
-	} else {
-		helper.OutputValues()
-	}
-
-}
-
-type MetricValue struct {
-	Name  string  `json:"name"`
-	Time  int64   `json:"time"`
-	Value float64 `json:"value"`
-}
-
-func sendServiceMetric(optApiKey string, optServiceName string) {
-
-	f, err := readData()
-
-	if err != nil {
-		panic("failed to parse /tmp/aws-billing-cache")
-	}
-
-	mapObj := f.(map[string]interface{})
-
-	var metricValues []MetricValue
-
-	now := time.Now().Unix()
-	for name, value := range mapObj {
-		f64, _ := strconv.ParseFloat(value.(string), 64)
-		metricValue := MetricValue{Name: "AWS.Billing." + name, Value: f64, Time: now}
-
-		metricValues = append(metricValues, metricValue)
-	}
-
-	jsonStr, _ := json.Marshal(metricValues)
-	client := &http.Client{}
-	req, _ := http.NewRequest("POST", fmt.Sprintf("https://mackerel.io/api/v0/services/%s/tsdb", optServiceName), bytes.NewBuffer([]byte(string(jsonStr))))
-	req.Header.Add("X-Api-Key", optApiKey)
-	req.Header.Set("Content-Type", "application/json")
-	client.Do(req)
-}
-
-func Do() {
-
-	optDest := os.Getenv("MACKEREL_METRICS")
-	if optDest == "" {
-		optDest = "ServiceMetric"
-	}
-	optApiKey := os.Getenv("MACKEREL_API_KEY")
-	optServiceName := os.Getenv("MACKEREL_SERVICE")
-	optAccessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
-	optSecretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
-	optCurrency := os.Getenv("AWS_DIMENSION_CURRENCY")
-	if optCurrency == "" {
-		optCurrency = "USD"
-	}
 	optTarget := os.Getenv("AWS_TARGET_SERVICE")
+	if optTarget == "" {
+		targets = billing.GetServiceNameList()
+	} else {
+		targets = strings.Split(optTarget, ",")
+	}
 
-	writeCache(optAccessKeyID, optSecretAccessKey, optCurrency, optTarget)
+	goroutines := len(targets)
+	c := make(chan *MetricValue)
+	for _, target := range targets {
+		go func(m chan<- *MetricValue, target string) {
+			metric, err := billing.GetMetricValue(target)
+			if err == nil {
+				m <- metric
+			} else {
+				log.Printf("%v: %s", target, err)
+				m <- nil
+			}
 
-	if optDest == "ServiceMetric" {
-		log.Printf("Send metrics to ServiceMetric[%s]\n", optServiceName)
-		sendServiceMetric(optApiKey, optServiceName)
-	} else if optDest == "Host" {
-		outputData()
+		}(c, target)
+	}
+
+	var metrics []MetricValue
+
+	for i := 0; i < goroutines; i++ {
+		metric := <-c
+		if (metric != nil) && ((*metric).Value > 0) {
+			metrics = append(metrics, MetricValue{
+				Name:  "AWS.billing." + (*metric).Name,
+				Time:  (*metric).Time,
+				Value: (*metric).Value,
+			})
+		}
+	}
+
+	close(c)
+
+	if optDebug {
+		PrintInJSON(os.Stdout, metrics)
+	}
+
+	if len(metrics) > 0 {
+		log.Printf("[AWS-Billing]: %v on %s", targets,
+			time.Unix(metrics[0].Time, 0).Format(time.UnixDate))
+
+		if optDryRun {
+			return
+		}
+
+		optMackerelServiceName := os.Getenv("MACKEREL_SERVICE")
+		if optMackerelServiceName != "" {
+			optMackerelApiKey := os.Getenv("MACKEREL_API_KEY")
+
+			if optMackerelApiKey == "" {
+				log.Fatal("Please set MACKEREL_API_KEY environment variable.")
+			}
+
+			SendMetricsToMackerelService(optMackerelApiKey, optMackerelServiceName, metrics)
+		} else {
+			SendMetricsToMackerelHost(metrics)
+		}
 	}
 }

@@ -19,9 +19,6 @@ Caution: You must must enable Billing Alerts.(see https://docs.aws.amazon.com/ja
 
 You must set environment variables in `.env` file first.
 
-- MACKEREL_METRICS(required)  
-  Use ServiceMetric.
-
 - MACKEREL_API_KEY(required)  
   MACKEREL_API_KEY is an API Key published by mackerel. 
   You must give read and write premissions to API Key.
@@ -39,7 +36,6 @@ You must set environment variables in `.env` file first.
   If AWS_TARGET_SERVICE is not specified, this plugin gets all available services.  
   If AWS_TARGET_SERVICE is specified, this plugin gets specified available services.  
   If you want to specify multiple services, separate with comma.(ex: AWS_TARGET_SERVICE=AmazonEC2,AWSLambda)  
-  If you want to get sum of costs, give All to target.(ex: AWS_TARGET_SERVICE=All)
 
 - AWS_DIMENSION_CURRENCY(optional)  
   Defalut is in US Dollar(USD).

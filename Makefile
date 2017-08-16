@@ -2,12 +2,13 @@ NAME    := mackerel-plugin-aws-billing
 IMAGE   := ailispaw/$(NAME)
 VERSION := 0.3.0
 
+build:
+	docker build -t $(IMAGE) src
+	docker tag $(IMAGE) $(IMAGE):builder
+
 run:
 	-docker rm -f $(NAME)
 	docker run --name $(NAME) --env-file .env $(IMAGE)
-
-build:
-	docker build -t $(IMAGE) src
 
 release:
 	docker build -t $(IMAGE) --build-arg VERSION=$(VERSION) release
@@ -18,6 +19,7 @@ push:
 	docker push $(IMAGE):latest
 
 clean:
-	docker rmi $$(docker images -q -f "dangling=true")
+	-docker rm $$(docker ps -a -q)
+	-docker rmi $$(docker images -q -f "dangling=true")
 
-.PHONY: run build release push clean
+.PHONY: build run release push clean
