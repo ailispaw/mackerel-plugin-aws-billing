@@ -1,6 +1,6 @@
 NAME    := mackerel-plugin-aws-billing
 IMAGE   := ailispaw/$(NAME)
-VERSION := 0.3.0
+VERSION := 0.5.0
 
 build:
 	docker build -t $(IMAGE) src
